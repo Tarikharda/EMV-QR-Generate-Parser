@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -55,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +65,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.google.zxing.BarcodeFormat
+import com.journeyapps.barcodescanner.BarcodeEncoder
 import ma.xpi.tlvtools.model.EmvQrData
 import ma.xpi.tlvtools.model.LanguageTemplate
 import ma.xpi.tlvtools.model.MerchantAccount
@@ -117,6 +121,7 @@ fun EmvQrParserApp() {
     var parsedData by remember { mutableStateOf<EmvQrData?>(null) }
     var parseError by remember { mutableStateOf<String?>(null) }
     var showJsonDialog by remember { mutableStateOf(false) }
+    var showQRCodeDialog by remember { mutableStateOf(false) }
     var jsonContent by remember { mutableStateOf("") }
     
     val parser = remember { EmvQrParser() }
@@ -278,6 +283,9 @@ fun EmvQrParserApp() {
                     onShowJson = {
                         jsonContent = parsedData!!.toJson()
                         showJsonDialog = true
+                    },
+                    onShowQrCode = {
+                        showQRCodeDialog = true
                     }
                 )
                 
@@ -313,13 +321,51 @@ fun EmvQrParserApp() {
                         }
                     )
                 }
+
+                // JSON Dialog
+                if (showQRCodeDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showQRCodeDialog = false },
+                        title = { Text("QR Code") },
+                        text = {
+                            Box(
+                                modifier = Modifier .fillMaxWidth(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val barcodeEncoder = BarcodeEncoder();
+                                val bitmap = barcodeEncoder.encodeBitmap(qrData, BarcodeFormat.QR_CODE, 500, 500);
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+
+                                    contentDescription = "QR Code"
+                                )
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                val clip = ClipData.newPlainText("JSON Data", jsonContent)
+                                clipboard.setPrimaryClip(clip)
+                                Toast.makeText(context, "JSON copied to clipboard", Toast.LENGTH_SHORT).show()
+                                showJsonDialog = false
+                            }) {
+                                Text("Share")
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { showJsonDialog = false }) {
+                                Text("Close")
+                            }
+                        }
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-fun ResultsSection(data: EmvQrData, context: Context, onShowJson: () -> Unit = {}) {
+fun ResultsSection(data: EmvQrData, context: Context, onShowJson: () -> Unit = {} , onShowQrCode: () -> Unit = {}) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -343,7 +389,14 @@ fun ResultsSection(data: EmvQrData, context: Context, onShowJson: () -> Unit = {
             ) {
                 Text("View as JSON")
             }
-            
+
+            Button(
+                onClick = onShowQrCode,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("View Generated QR Code")
+            }
+
             // CRC Validation Status
             Box(
                 modifier = Modifier
