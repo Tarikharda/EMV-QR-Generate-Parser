@@ -39,17 +39,30 @@ class EmvQrParser {
         const val ID_CRC = "63"
 
         // Additional Data field IDs
-        const val ID_ADDITIONAL_BILL_NUMBER = "01"
-        const val ID_ADDITIONAL_MOBILE_NUMBER = "02"
+        const val ID_ADDITIONAL_TRX_DATE = "01"
+        const val ID_ADDITIONAL_TRX_TIME = "02"
         const val ID_ADDITIONAL_STORE_LABEL = "03"
         const val ID_ADDITIONAL_LOYALTY_NUMBER = "04"
         const val ID_ADDITIONAL_REFERENCE_LABEL = "05"
         const val ID_ADDITIONAL_CUSTOMER_LABEL = "06"
         const val ID_ADDITIONAL_TERMINAL_LABEL = "07"
-        const val ID_ADDITIONAL_PURPOSE_TRANSACTION = "08"
+        const val ID_ADDITIONAL_AUTH_CODE = "08"
         const val ID_ADDITIONAL_CONSUMER_DATA_REQUEST = "09"
-        const val ID_ADDITIONAL_RFU_START = "10"
-        const val ID_ADDITIONAL_RFU_END = "99"
+
+//
+//        // Unreserved Templates (Custom) field IDs
+//        const val ID_FOOTER_TICKET = "11"
+//        const val ID_INTERCHANGE_FEE = "12"
+//        const val ID_APPLICATION_NAME = "13"
+//        const val ID_BATCH_NUMBER = "14"
+//        const val ID_RECEIPT_NUMBER = "15"
+//
+//        const val ID_SCRT_EMVDATA_TAG_84 = "16"
+//        const val ID_SCRT_EMVDATA_TAG_95 = "17"
+//        const val ID_SCRT_EMVDATA_TAG_9F10 = "18"
+//        const val ID_SCRT_EMVDATA_TAG_9B = "19"
+//        const val ID_SCRT_EMVDATA_TAG_9F34_9F10 = "20"
+//        const val ID_TRX_WORDING = "21"
 
         // Language Template field IDs
         const val ID_LANGUAGE_PREFERENCE = "00"
@@ -58,7 +71,7 @@ class EmvQrParser {
         const val ID_LANGUAGE_RFU_START = "03"
         const val ID_LANGUAGE_RFU_END = "99"
 
-        // Unreserved Templates (Custom) field IDs
+//        // Unreserved Templates (Custom) field IDs
         const val ID_FOOTER_TICKET = "80"
         const val ID_INTERCHANGE_FEE = "81"
         const val ID_APPLICATION_NAME = "82"
@@ -70,6 +83,12 @@ class EmvQrParser {
         const val ID_SCRT_EMVDATA_TAG_9F10 = "87"
         const val ID_SCRT_EMVDATA_TAG_9B = "88"
         const val ID_SCRT_EMVDATA_TAG_9F34_9F10 = "89"
+        const val ID_TRX_WORDING = "90"
+        const val ID_TERMINAL_ADDRESS = "91"
+        const val ID_OUTLET_NUMBER = "92"
+        const val ID_TRX_SCHEME = "93"
+        const val ID_CARD_SEQUENCE = "94"
+        const val ID_TRANSACTION_TYPE = "95"
 
         // Transaction data field names as constants
         const val ACQUIRER_MERCHANT_OUTLET_NAME = "Acquirer.Merchant.Outlet.Name"
@@ -88,8 +107,8 @@ class EmvQrParser {
         const val REF_INTERCHANGE_FEE = "REF.interchangeFee"
         const val REF_AUTH_CODE = "REF.autCode"
         const val FOOTER_TICKET = "FOOTER_TICKET"
-        const val SCRT_EMVDATA_APP_NAME = "SCRT.EMVDATA{getApplicationName:0:}"
 
+        const val SCRT_EMVDATA_APP_NAME = "SCRT.EMVDATA{getApplicationName:0:}"
         const val SCRT_EMVDATA_TAG_84 = "SCRT.EMVDATA{getEMVTag:84:}"
         const val SCRT_EMVDATA_TAG_95 = "SCRT.EMVDATA{getEMVTag:95:}"
         const val SCRT_EMVDATA_TAG_9F10 = "SCRT.EMVDATA{getEMVTag:9F10:}"
@@ -98,6 +117,7 @@ class EmvQrParser {
 
         const val BATCH_NUMBER = "BatchNumber"
         const val RECEIPT_NUMBER = "ReceiptNumber"
+        const val TRX_TYPE = "TransactionType"
     }
 
     /**
@@ -105,6 +125,8 @@ class EmvQrParser {
      * @param qrData The EMV QR code string to parse
      * @return The parsed EMV QR data
      */
+    private fun String.hexToInt(): Int = this.toInt(16)
+
     fun parse(qrData: String): Result<EmvQrData> {
         return runCatching {
             // Validate CRC
@@ -120,7 +142,7 @@ class EmvQrParser {
             
             // Extract merchant account info
             val merchantAccountInfoList = tlvObjects
-                .filter { it.id.toInt() in ID_MERCHANT_ACCOUNT_INFO_START.toInt()..ID_MERCHANT_ACCOUNT_INFO_END.toInt() }
+                .filter { it.id.hexToInt() in ID_MERCHANT_ACCOUNT_INFO_START.hexToInt()..ID_MERCHANT_ACCOUNT_INFO_END.hexToInt() }
                 .map { tlv ->
                     val subTlvs = parseTlvObjects(tlv.value)
                     MerchantAccount(
@@ -154,7 +176,7 @@ class EmvQrParser {
                 emptyMap()
             }
 
-            // Extract Unreserved Templates data
+            // Extract Unreserved Templates data TODO : still need to improve
             val unrevetedTemplatesTlv = tlvObjects.find { it.id == FOOTER_TICKET }
             val unrevetedTemplatesData = if (unrevetedTemplatesTlv != null) {
                 val unrevetedTemplatesObjects = parseTlvObjects(unrevetedTemplatesTlv.value)
@@ -219,28 +241,32 @@ class EmvQrParser {
             // Parse ID (2 characters)
             if (index + 2 > data.length) break
             val id = data.substring(index, index + 2)
-            Log.d("parseTlvObjects", "id $id")
             index += 2
 
             // Parse length (2 characters)
             if (index + 2 > data.length) break
-            val length = data.substring(index, index + 2).toInt()
-            Log.d("parseTlvObjects", "length $length")
+            val lengthHex = data.substring(index, index + 2)
             index += 2
+
+            // Add error handling for length conversion
+            val length = try {
+                lengthHex.toInt(16)  // Convert HEX to DECIMAL
+            } catch (e: NumberFormatException) {
+                Log.e("TLV Parser", "Invalid length value: $lengthHex")
+                break  // Exit loop on invalid length
+            }
 
             // Parse value (length characters)
             if (index + length > data.length) break
             val value = data.substring(index, index + length)
-            Log.d("parseTlvObjects", "value $value")
             index += length
 
             // Add TLV object to list
             tlvObjects.add(TlvObject(id, length, value))
         }
-        
+
         return tlvObjects
     }
-
     /**
      * Validate the CRC of an EMV QR code
      * @param qrData The EMV QR code string to validate
@@ -266,11 +292,6 @@ class EmvQrParser {
         return calculatedCrc.equals(providedCrc, ignoreCase = true)
     }
 
-    /**
-     * Get the name of a merchant account based on its ID
-     * @param id The ID of the merchant account
-     * @return The name of the merchant account
-     */
     private fun getMerchantAccountName(id: String): String {
         return when (id) {
             "02" -> "Visa"
@@ -309,21 +330,16 @@ class EmvQrParser {
 
 
 
-    /**
-     * Get the name of an additional data field based on its ID
-     * @param id The ID of the additional data field
-     * @return The name of the additional data field
-     */
     private fun getAdditionalDataFieldName(id: String): String {
         return when (id) {
-            ID_ADDITIONAL_BILL_NUMBER -> "Bill Number"
-            ID_ADDITIONAL_MOBILE_NUMBER -> "Mobile Number"
+            ID_ADDITIONAL_TRX_DATE -> "Bill Number"
+            ID_ADDITIONAL_TRX_TIME -> "Mobile Number"
             ID_ADDITIONAL_STORE_LABEL -> "Store Label"
             ID_ADDITIONAL_LOYALTY_NUMBER -> "Loyalty Number"
             ID_ADDITIONAL_REFERENCE_LABEL -> "Reference Label"
             ID_ADDITIONAL_CUSTOMER_LABEL -> "Customer Label"
             ID_ADDITIONAL_TERMINAL_LABEL -> "Terminal Label"
-            ID_ADDITIONAL_PURPOSE_TRANSACTION -> "Purpose of Transaction"
+            ID_ADDITIONAL_AUTH_CODE -> "Purpose of Transaction"
             ID_ADDITIONAL_CONSUMER_DATA_REQUEST -> "Consumer Data Request"
             ID_SCRT_EMVDATA_TAG_84 -> "AID"
             else -> "Additional Field ($id)"
@@ -337,18 +353,14 @@ class EmvQrParser {
             else -> "Unreserved Templates ($id)"
         }
     }
-    /**
-     * Generate an EMV QR code string based on transaction data
-     * @param transactionData Map of transaction data
-     * @return The EMV QR code string
-     */
+
     fun generate(transactionData: Map<String, String>): String {
         val qrCodeBuilder = StringBuilder()
 
         addField(qrCodeBuilder, ID_PAYLOAD_FORMAT, "01")
         addField(qrCodeBuilder, ID_INITIATION_METHOD, "11")
 
-        addField(qrCodeBuilder, ID_MCC, transactionData[ACQUIRER_MERCHANT_OUTLET_NUMBER] ?: "5541")
+        addField(qrCodeBuilder, ID_OUTLET_NUMBER, transactionData[ACQUIRER_MERCHANT_OUTLET_NUMBER] ?: "5541")
         val currencyAlpha = transactionData[REF_CURRENCY_ISO_CODE_ALPHA] ?: "JOD"
         val currencyNumeric = convertCurrencyAlphaToNumeric(currencyAlpha)
         addField(qrCodeBuilder, ID_CURRENCY, currencyNumeric)
@@ -356,7 +368,7 @@ class EmvQrParser {
         val amount = transactionData[REF_TRX_AMOUNT] ?: "1"
         addField(qrCodeBuilder, ID_AMOUNT, formatAmount(amount, currencyAlpha))
 
-        addField(qrCodeBuilder, ID_COUNTRY_CODE, "400")
+        addField(qrCodeBuilder, ID_COUNTRY_CODE, "JO")
 
         val merchantName = transactionData[ACQUIRER_MERCHANT_OUTLET_NAME] ?: "JORDAN GATE GAS STATION"
         addField(qrCodeBuilder, ID_MERCHANT_NAME, merchantName.substring(0, minOf(merchantName.length, 25)))
@@ -367,25 +379,34 @@ class EmvQrParser {
         } else {
             "AMMAN"
         }
-        addField(qrCodeBuilder, ID_MERCHANT_CITY, city)
+        addField(qrCodeBuilder, ID_TERMINAL_ADDRESS, city)
+
+
 
         val additionalDataBuilder = StringBuilder()
 
         val transactionDate = transactionData[REF_DATE_TIME_SUBSTRING_0_10] ?: ""
         if (transactionDate.isNotEmpty()) {
             val formattedDate = formatDate(transactionDate)
-            addField(additionalDataBuilder, ID_ADDITIONAL_BILL_NUMBER, formattedDate)
+//            Log.d("itsme" , "Formated date  ; " + formattedDate);
+            addField(additionalDataBuilder, ID_ADDITIONAL_TRX_DATE, transactionDate)
         }
 
         val transactionTime = transactionData[REF_DATE_TIME_SUBSTRING_11_19] ?: ""
         if (transactionTime.isNotEmpty()) {
             val formattedTime = formatTime(transactionTime)
-            addField(additionalDataBuilder, ID_ADDITIONAL_MOBILE_NUMBER, formattedTime)
+            addField(additionalDataBuilder, ID_ADDITIONAL_TRX_TIME, formattedTime)
         }
+
+        val cardNumber = transactionData[CARD_NUMBER_HIDE] ?: ""
+        if (cardNumber.isNotEmpty()) {
+            addField(additionalDataBuilder, ID_ADDITIONAL_LOYALTY_NUMBER, cardNumber)
+        }
+
 
         val terminalNumber = transactionData[ACQUIRER_MERCHANT_OUTLET_TERMINAL_NUMBER] ?: ""
         if (terminalNumber.isNotEmpty()) {
-            addField(additionalDataBuilder, ID_ADDITIONAL_STORE_LABEL, terminalNumber)
+            addField(additionalDataBuilder, ID_ADDITIONAL_TERMINAL_LABEL, terminalNumber)
         }
 
         val referenceNumber = transactionData[REF_REFERENCE] ?: ""
@@ -395,8 +416,10 @@ class EmvQrParser {
 
         val authCode = transactionData[REF_AUTH_CODE] ?: ""
         if (authCode.isNotEmpty()) {
-            addField(additionalDataBuilder, ID_ADDITIONAL_PURPOSE_TRANSACTION, authCode)
+            addField(additionalDataBuilder, ID_ADDITIONAL_AUTH_CODE, authCode)
         }
+
+
 
         if (additionalDataBuilder.isNotEmpty()) {
             addField(qrCodeBuilder, ID_ADDITIONAL_DATA, additionalDataBuilder.toString())
@@ -442,6 +465,22 @@ class EmvQrParser {
             addField(qrCodeBuilder, ID_SCRT_EMVDATA_TAG_9F34_9F10, emv_9F34_9F10)
         }
 
+        val trx_wording = transactionData[REF_TRANSACTION_TYPE_WORDING] ?: ""
+        if (trx_wording.isNotEmpty()) {
+            addField(qrCodeBuilder, ID_TRX_WORDING, trx_wording)
+        }
+
+        val cardSeq = transactionData[CARD_SEQUENCE] ?: ""
+        if (cardSeq.isNotEmpty()) {
+            addField(qrCodeBuilder, ID_CARD_SEQUENCE, cardSeq)
+        }
+
+        val typeScheme = transactionData[REF_TRANSACTION_TYPE_SCHEME] ?: ""
+        if (typeScheme.isNotEmpty()) {
+            addField(qrCodeBuilder, ID_TRX_SCHEME, typeScheme)
+        }
+
+
         val batchNumber = transactionData[BATCH_NUMBER] ?: ""
         if (batchNumber.isNotEmpty()) {
             addField(qrCodeBuilder, ID_BATCH_NUMBER, batchNumber)
@@ -452,17 +491,19 @@ class EmvQrParser {
             addField(qrCodeBuilder, ID_RECEIPT_NUMBER, receiptNumber)
         }
 
+        val transactionType = transactionData[TRX_TYPE] ?: ""
+        if (transactionType.isNotEmpty()) {
+            addField(qrCodeBuilder, ID_TRANSACTION_TYPE, transactionType)
+        }
+
+
+
         val crc = calculateCrc(qrCodeBuilder.toString())
         addField(qrCodeBuilder, ID_CRC, crc)
 
+//        return "https://dev.xpi.ma:5443/MerchantBO/QRscanner.html?qrdata="+qrCodeBuilder.toString()
         return qrCodeBuilder.toString()
     }
-    /**
-     * Add a field to the QR code string
-     * @param builder The builder to add the field to
-     * @param id The ID of the field
-     * @param value The value of the field
-     */
     private fun addField(builder: StringBuilder, id: String, value: String) {
         if (value.isEmpty()) return
 
@@ -470,13 +511,7 @@ class EmvQrParser {
         builder.append(id).append(length).append(value)
     }
 
-    /**
-     * Format a date string from MM/DD/YYYY to YYMMDD
-     * @param dateString The date string to format (MM/DD/YYYY)
-     * @return The formatted date string (YYMMDD)
-     */
     private fun formatDate(dateString: String): String {
-        // Assuming input format is MM/DD/YYYY or similar
         val parts = dateString.split("/")
         if (parts.size >= 3) {
             val year = parts[2].substring(2, 4) // Get last 2 digits of year
@@ -487,24 +522,11 @@ class EmvQrParser {
         return ""
     }
 
-    /**
-     * Format a time string from HH:MM:SS to HHMMSS
-     * @param timeString The time string to format (HH:MM:SS)
-     * @return The formatted time string (HHMMSS)
-     */
     private fun formatTime(timeString: String): String {
-        // Remove colons from time string
         return timeString.replace(":", "")
     }
 
-    /**
-     * Format an amount for the QR code
-     * @param amount The amount to format
-     * @param currencyCode The currency code (JOD, USD, etc.)
-     * @return The formatted amount
-     */
     private fun formatAmount(amount: String, currencyCode: String): String {
-        // Convert to minor units based on currency
         val amountValue = amount.toDoubleOrNull() ?: 0.0
 
         val minorUnits = when (currencyCode) {
@@ -517,11 +539,6 @@ class EmvQrParser {
         return amountInMinorUnits.toString()
     }
 
-    /**
-     * Convert currency alpha code to numeric ISO 4217 code
-     * @param alpha The alpha currency code (e.g., JOD)
-     * @return The numeric currency code (e.g., 400)
-     */
     private fun convertCurrencyAlphaToNumeric(alpha: String): String {
         return when (alpha) {
             "JOD" -> "400"
@@ -530,20 +547,13 @@ class EmvQrParser {
             "SAR" -> "682"
             "AED" -> "784"
             "GBP" -> "826"
-            else -> "400" // Default to JOD if unknown
+            else -> "400"
         }
     }
 
-    /**
-     * Calculate CRC-16 checksum for EMV QR code
-     * @param data The data to calculate the CRC for
-     * @return The calculated CRC as a 4-character hexadecimal string
-     */
     private fun calculateCrc(data: String): String {
-        // Create the data with CRC field ID and length placeholder
         val dataWithCrcField = data + ID_CRC + "04"
 
-        // CRC-16 CCITT (0x1021) calculation
         val polynomial = 0x1021
         var crc = 0xFFFF
 
@@ -560,7 +570,6 @@ class EmvQrParser {
             }
         }
 
-        // Return CRC as 4-character uppercase hex string
         return String.format("%04X", crc)
     }
 }

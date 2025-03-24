@@ -40,7 +40,8 @@ object CurrencyMap {
         "484" to CurrencyInfo("MXN", "Mexican Peso", "Mex$"),
         "032" to CurrencyInfo("ARS", "Argentine Peso", "AR$"),
         "152" to CurrencyInfo("CLP", "Chilean Peso", "CLP$"),
-        "604" to CurrencyInfo("PEN", "Peruvian Sol", "S/")
+        "604" to CurrencyInfo("PEN", "Peruvian Sol", "S/"),
+        "400" to CurrencyInfo("JOD", "Jordanian Dinar", "JD")
     )
 
     /**

@@ -95,6 +95,7 @@ import ma.xpi.tlvtools.parser.EmvQrParser.Companion.SCRT_EMVDATA_TAG_95
 import ma.xpi.tlvtools.parser.EmvQrParser.Companion.SCRT_EMVDATA_TAG_9B
 import ma.xpi.tlvtools.parser.EmvQrParser.Companion.SCRT_EMVDATA_TAG_9F10
 import ma.xpi.tlvtools.parser.EmvQrParser.Companion.SCRT_EMVDATA_TAG_9F34_9F10
+import ma.xpi.tlvtools.parser.EmvQrParser.Companion.TRX_TYPE
 import ma.xpi.tlvtools.ui.theme.TLVtoolsTheme
 import ma.xpi.tlvtools.util.CurrencyMap
 import ma.xpi.tlvtools.util.MccMap
@@ -211,6 +212,7 @@ fun EmvQrParserApp() {
                                     ACQUIRER_MERCHANT_OUTLET_TERMINAL_ADDRESS to "JORDAN GATE GAS STATION - AMMAN JO",
                                     ACQUIRER_MERCHANT_OUTLET_NUMBER to "71002374",
                                     ACQUIRER_MERCHANT_OUTLET_TERMINAL_NUMBER to "71002374",
+                                    TRX_TYPE to "H-CA-T-POS-T-PUR-VIS-OO-1",
                                     REF_REFERENCE to "504217190001",
                                     REF_TRANSACTION_TYPE_WORDING to "PURCHASE",
                                     REF_DATE_TIME_SUBSTRING_0_10 to "250211", // Corrected format to YYMMDD
@@ -232,7 +234,7 @@ fun EmvQrParserApp() {
                                     BATCH_NUMBER to "3",
                                     RECEIPT_NUMBER to "135"
                                 )
-                                qrData = parser.generate(transactionData);
+                                qrData = parser.generate(transactionData)
 
                             },
                             modifier = Modifier.weight(1f)
